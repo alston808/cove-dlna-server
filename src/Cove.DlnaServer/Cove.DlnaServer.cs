@@ -187,6 +187,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
         {
             using var reader = new System.IO.StreamReader(context.Request.Body);
             var requestBody = await reader.ReadToEndAsync();
+            Console.WriteLine("DLNA BROWSE REQUEST:\n" + requestBody);
             
             // Basic string extraction to avoid heavy XML parsing errors
             string objectId = "0";
