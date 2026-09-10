@@ -261,7 +261,8 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                         sb.Append($@"<item id=""100{v.Id}"" parentID=""{objectId}"" restricted=""1"">");
                         sb.Append($@"<dc:title>{title}</dc:title>");
                         sb.Append($@"<upnp:class>object.item.videoItem</upnp:class>");
-                        sb.Append($@"<res protocolInfo=""http-get:*:{mimeType}:DLNA.ORG_PN=AVC_MP4_HP_HD_AAC;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"" size=""12345"">{eUrl}</res>");
+                        sb.Append($@"<dc:date>2026-01-01T00:00:00</dc:date>");
+                        sb.Append($@"<res size=""500000000"" duration=""1:00:00.000"" resolution=""1920x1080"" protocolInfo=""http-get:*:video/mp4:*"">{eUrl}</res>");
                         sb.Append($@"</item>");
                     }
                     didlStr = sb.ToString();
