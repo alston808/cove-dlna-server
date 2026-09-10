@@ -2,14 +2,15 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Cove.Sdk;
 using Cove.Plugins;
-using System.Timers;
+using Cove.Core.Entities;
+using System.Xml.Linq;
 
 namespace Cove.DlnaServer;
 
@@ -59,7 +60,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
         });
 
         // Protected media streaming endpoint
-        endpoints.MapGet("/api/ext/com.example.dlna-server/stream/{id}", async (HttpContext context, string id) =>
+        endpoints.MapGet("/api/ext/com.example.dlna-server/stream/{id:int}", async (HttpContext context, int id, DbContext db) =>
         {
             var token = context.Request.Query["t"];
             if (token != _currentToken)
@@ -69,16 +70,139 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 return;
             }
 
-            // TODO: Query your Cove database for the file path matching the 'id'
-            // var filePath = ...;
-            // await context.Response.SendFileAsync(filePath);
+            var video = await db.Set<Video>().Include(v => v.Files).FirstOrDefaultAsync(v => v.Id == id);
+            if (video == null || video.Files == null || !video.Files.Any())
+            {
+                context.Response.StatusCode = 404;
+                return;
+            }
             
-            await context.Response.WriteAsync($"Streaming video {id} using valid token!");
+            var path = video.Files.First().Path;
+            await context.Response.SendFileAsync(path);
+        });
+
+        endpoints.MapGet("/api/ext/com.example.dlna-server/content-directory", async (HttpContext context) =>
+        {
+            context.Response.ContentType = "text/xml";
+            string scpd = @"<?xml version=""1.0""?>
+<scpd xmlns=""urn:schemas-upnp-org:service-1-0"">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <actionList>
+    <action>
+      <name>Browse</name>
+      <argumentList>
+        <argument><name>ObjectID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_ObjectID</relatedStateVariable></argument>
+        <argument><name>BrowseFlag</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_BrowseFlag</relatedStateVariable></argument>
+        <argument><name>Filter</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_Filter</relatedStateVariable></argument>
+        <argument><name>StartingIndex</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_Index</relatedStateVariable></argument>
+        <argument><name>RequestedCount</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
+        <argument><name>SortCriteria</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_SortCriteria</relatedStateVariable></argument>
+        <argument><name>Result</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Result</relatedStateVariable></argument>
+        <argument><name>NumberReturned</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
+        <argument><name>TotalMatches</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Count</relatedStateVariable></argument>
+        <argument><name>UpdateID</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_UpdateID</relatedStateVariable></argument>
+      </argumentList>
+    </action>
+  </actionList>
+  <serviceStateTable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_ObjectID</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_Result</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_BrowseFlag</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_Filter</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_SortCriteria</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_Index</name><dataType>ui4</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_Count</name><dataType>ui4</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_UpdateID</name><dataType>ui4</dataType></stateVariable>
+  </serviceStateTable>
+</scpd>";
+            await context.Response.WriteAsync(scpd);
+        });
+
+        endpoints.MapPost("/api/ext/com.example.dlna-server/control", async (HttpContext context, DbContext db) =>
+        {
+            using var reader = new System.IO.StreamReader(context.Request.Body);
+            var requestBody = await reader.ReadToEndAsync();
+            
+            // Basic string extraction to avoid heavy XML parsing errors
+            string objectId = "0";
+            string browseFlag = "BrowseDirectChildren";
+            
+            if (requestBody.Contains("<ObjectID>"))
+            {
+                var start = requestBody.IndexOf("<ObjectID>") + 10;
+                var end = requestBody.IndexOf("</ObjectID>");
+                if (end > start) objectId = requestBody.Substring(start, end - start);
+            }
+            if (requestBody.Contains("<BrowseFlag>"))
+            {
+                var start = requestBody.IndexOf("<BrowseFlag>") + 12;
+                var end = requestBody.IndexOf("</BrowseFlag>");
+                if (end > start) browseFlag = requestBody.Substring(start, end - start);
+            }
+
+            string didlStr = "";
+            int count = 0;
+            int totalMatches = 0;
+
+            var hostIp = context.Request.Host.Host;
+            var hostPort = context.Request.Host.Port ?? 5073;
+
+            if (objectId == "0") // Root
+            {
+                if (browseFlag == "BrowseMetadata")
+                {
+                    didlStr = @"<container id=""0"" parentID=""-1"" restricted=""1""><dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">Root</dc:title><upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.container</upnp:class></container>";
+                    count = 1;
+                    totalMatches = 1;
+                }
+                else if (browseFlag == "BrowseDirectChildren")
+                {
+                    var videos = await db.Set<Video>().Include(v => v.Files).Take(50).ToListAsync();
+                    totalMatches = videos.Count;
+                    count = videos.Count;
+
+                    var sb = new System.Text.StringBuilder();
+                    foreach(var v in videos)
+                    {
+                        var title = System.Security.SecurityElement.Escape(v.Title ?? "Unknown Video");
+                        var mimeType = "video/mp4"; // Default
+                        var url = $"http://{hostIp}:{hostPort}/api/ext/com.example.dlna-server/stream/{v.Id}?t={_currentToken}";
+                        var eUrl = System.Security.SecurityElement.Escape(url);
+                        
+                        sb.Append($@"<item id=""{v.Id}"" parentID=""0"" restricted=""1"">");
+                        sb.Append($@"<dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">{title}</dc:title>");
+                        sb.Append($@"<upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.item.videoItem</upnp:class>");
+                        sb.Append($@"<res protocolInfo=""http-get:*:{mimeType}:*"" size=""12345"">{eUrl}</res>");
+                        sb.Append($@"</item>");
+                    }
+                    didlStr = sb.ToString();
+                }
+            }
+
+            var escapedDidl = System.Security.SecurityElement.Escape($@"<DIDL-Lite xmlns=""urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"" xmlns:dc=""http://purl.org/dc/elements/1.1/"" xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">{didlStr}</DIDL-Lite>");
+
+            string responseXml = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<s:Envelope s:encodingStyle=""http://schemas.xmlsoap.org/soap/encoding/"" xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <s:Body>
+    <u:BrowseResponse xmlns:u=""urn:schemas-upnp-org:service:ContentDirectory:1"">
+      <Result>{escapedDidl}</Result>
+      <NumberReturned>{count}</NumberReturned>
+      <TotalMatches>{totalMatches}</TotalMatches>
+      <UpdateID>1</UpdateID>
+    </u:BrowseResponse>
+  </s:Body>
+</s:Envelope>";
+            context.Response.ContentType = "text/xml; charset=\"utf-8\"";
+            await context.Response.WriteAsync(responseXml);
         });
     }
+
     public async Task RunAsync(IServiceProvider services, CancellationToken ct)
     {
-        var logger = services.GetRequiredService<ILogger<DlnaExtension>>();
+        var logger = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DlnaExtension>>(services);
         logger.LogInformation("DLNA Server starting up...");
 
         try
@@ -92,7 +216,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 .Select(a => a.Address.ToString())
                 .FirstOrDefault() ?? "127.0.0.1";
                 
-            var covePort = 5073; // Based on your docker-compose.allinone.yml
+            var covePort = 5073;
 
             var deviceDefinition = new Rssdp.SsdpRootDevice()
             {
@@ -107,26 +231,21 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 Uuid = Uuid
             };
 
-            // Pass localIp so it broadcasts on the correct interface, rather than a docker interface
             using var commsServer = new Rssdp.Infrastructure.SsdpCommunicationsServer(new Rssdp.SocketFactory(localIp));
             using var devicePublisher = new Rssdp.SsdpDevicePublisher(commsServer);
             
             devicePublisher.AddDevice(deviceDefinition);
             logger.LogInformation("UPnP Device Published! Waiting for SSDP discovery requests.");
 
-            while (!ct.IsCancellationRequested)
-            {
-                await Task.Delay(10000, ct);
-                // The devicePublisher automatically responds to M-SEARCH requests in the background.
-            }
+            await Task.Delay(Timeout.Infinite, ct);
         }
-        catch (OperationCanceledException)
+        catch (TaskCanceledException)
         {
             logger.LogInformation("DLNA Server shutting down gracefully.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "DLNA Server encountered an error.");
+            logger.LogError(ex, "DLNA Server encountered a fatal error.");
         }
     }
 }
