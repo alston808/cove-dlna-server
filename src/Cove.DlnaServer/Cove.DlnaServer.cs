@@ -16,7 +16,7 @@ namespace Cove.DlnaServer;
 
 public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IApiExtension
 {
-    private const string Uuid = "b3c7b653-7313-41bb-98f5-9afb762ef4f1"; // Fixed UUID for SSDP
+    private const string Uuid = "d4d8c764-8424-42cc-a9f6-0b0c7a3f5b02"; // Fixed UUID for SSDP
     private static string _currentToken = Guid.NewGuid().ToString("N");
     private static System.Timers.Timer _tokenRotationTimer;
 
@@ -38,7 +38,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
   <specVersion><major>1</major><minor>0</minor></specVersion>
   <device>
     <deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
-    <friendlyName>Cove Media Server</friendlyName>
+    <friendlyName>Cove Media Server 2</friendlyName>
     <manufacturer>alston808</manufacturer>
     <modelName>Windows Media Connect compatible (Cove)</modelName>
     <UDN>uuid:{Uuid}</UDN>
