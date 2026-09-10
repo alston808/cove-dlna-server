@@ -269,7 +269,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
             }
 
 
-            var escapedDidl = System.Security.SecurityElement.Escape($@"<DIDL-Lite xmlns=""urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"">{didlStr}</DIDL-Lite>");
+            var escapedDidl = System.Security.SecurityElement.Escape($@"<DIDL-Lite xmlns:dc=""http://purl.org/dc/elements/1.1/"" xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"" xmlns=""urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"" xmlns:dlna=""urn:schemas-dlna-org:metadata-1-0/"">{didlStr}</DIDL-Lite>");
 
             string responseXml = $@"<?xml version=""1.0"" encoding=""utf-8""?>
 <s:Envelope s:encodingStyle=""http://schemas.xmlsoap.org/soap/encoding/"" xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
