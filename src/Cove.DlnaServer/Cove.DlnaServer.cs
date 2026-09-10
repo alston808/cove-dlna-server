@@ -215,7 +215,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
 
             if (browseFlag == "BrowseMetadata")
             {
-                didlStr = $@"<container id=""{objectId}"" parentID=""-1"" restricted=""1""><dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">Folder</dc:title><upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.container</upnp:class></container>";
+                didlStr = $@"<container id=""{objectId}"" parentID=""-1"" restricted=""1""><dc:title>Folder</dc:title><upnp:class>object.container</upnp:class></container>";
                 count = 1;
                 totalMatches = 1;
             }
@@ -224,7 +224,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 if (objectId == "0")
                 {
                     // Root directory shows "All Videos" folder
-                    didlStr = $@"<container id=""1"" parentID=""0"" restricted=""1""><dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">All Videos</dc:title><upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.container</upnp:class></container>";
+                    didlStr = $@"<container id=""1"" parentID=""0"" restricted=""1""><dc:title>All Videos</dc:title><upnp:class>object.container</upnp:class></container>";
                     count = 1;
                     totalMatches = 1;
                 }
@@ -243,8 +243,8 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                         var eUrl = System.Security.SecurityElement.Escape(url);
                         
                         sb.Append($@"<item id=""vid_{v.Id}"" parentID=""{objectId}"" restricted=""1"">");
-                        sb.Append($@"<dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">{title}</dc:title>");
-                        sb.Append($@"<upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.item.videoItem</upnp:class>");
+                        sb.Append($@"<dc:title>{title}</dc:title>");
+                        sb.Append($@"<upnp:class>object.item.videoItem</upnp:class>");
                         sb.Append($@"<res protocolInfo=""http-get:*:{mimeType}:*"" size=""12345"">{eUrl}</res>");
                         sb.Append($@"</item>");
                     }
@@ -252,7 +252,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 }
             }
 
-            var escapedDidl = System.Security.SecurityElement.Escape($@"<DIDL-Lite xmlns=""urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"" xmlns:dc=""http://purl.org/dc/elements/1.1/"" xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">{didlStr}</DIDL-Lite>");
+            var escapedDidl = System.Security.SecurityElement.Escape($@"<DIDL-Lite xmlns=""urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"">{didlStr}</DIDL-Lite>");
 
             string responseXml = $@"<?xml version=""1.0"" encoding=""utf-8""?>
 <s:Envelope s:encodingStyle=""http://schemas.xmlsoap.org/soap/encoding/"" xmlns:s=""http://schemas.xmlsoap.org/soap/envelope/"">
