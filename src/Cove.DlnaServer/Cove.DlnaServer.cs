@@ -107,8 +107,9 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 Uuid = Uuid
             };
 
-            // Using default SsdpDevicePublisher binds to all available IP addresses
-            using var devicePublisher = new Rssdp.SsdpDevicePublisher();
+            // Pass localIp so it broadcasts on the correct interface, rather than a docker interface
+            using var commsServer = new Rssdp.Infrastructure.SsdpCommunicationsServer(new Rssdp.SocketFactory(localIp));
+            using var devicePublisher = new Rssdp.SsdpDevicePublisher(commsServer);
             
             devicePublisher.AddDevice(deviceDefinition);
             logger.LogInformation("UPnP Device Published! Waiting for SSDP discovery requests.");
