@@ -213,6 +213,14 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
             var hostIp = context.Request.Host.Host;
             var hostPort = context.Request.Host.Port ?? 5073;
 
+                        int startingIndex = 0;
+            if (requestBody.Contains("<StartingIndex>"))
+            {
+                var start = requestBody.IndexOf("<StartingIndex>") + 15;
+                var end = requestBody.IndexOf("</StartingIndex>");
+                if (end > start) int.TryParse(requestBody.Substring(start, end - start), out startingIndex);
+            }
+
             if (browseFlag == "BrowseMetadata")
             {
                 didlStr = $@"<container id=""{objectId}"" parentID=""-1"" restricted=""1""><dc:title>Folder</dc:title><upnp:class>object.container</upnp:class></container>";
@@ -223,15 +231,23 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
             {
                 if (objectId == "0")
                 {
-                    // Root directory shows "All Videos" folder
-                    didlStr = $@"<container id=""1"" parentID=""0"" restricted=""1""><dc:title>All Videos</dc:title><upnp:class>object.container</upnp:class></container>";
-                    count = 1;
                     totalMatches = 1;
+                    if (startingIndex == 0)
+                    {
+                        didlStr = $@"<container id=""1"" parentID=""0"" restricted=""1"" childCount=""50""><dc:title>All Videos</dc:title><upnp:class>object.container</upnp:class></container>";
+                        count = 1;
+                    }
+                    else
+                    {
+                        count = 0;
+                        didlStr = "";
+                    }
                 }
                 else
                 {
-                    var videos = await db.Set<Video>().Include(v => v.Files).Take(50).ToListAsync();
-                    totalMatches = videos.Count;
+                    var videos = await db.Set<Video>().Include(v => v.Files).OrderBy(v => v.Id).Skip(startingIndex).Take(50).ToListAsync();
+                    var totalVideos = await db.Set<Video>().CountAsync();
+                    totalMatches = totalVideos;
                     count = videos.Count;
 
                     var sb = new System.Text.StringBuilder();
@@ -242,7 +258,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                         var url = $"http://{hostIp}:{hostPort}/api/ext/com.example.dlna-server/stream/{v.Id}?t={_currentToken}";
                         var eUrl = System.Security.SecurityElement.Escape(url);
                         
-                        sb.Append($@"<item id=""vid_{v.Id}"" parentID=""{objectId}"" restricted=""1"">");
+                        sb.Append($@"<item id=""100{v.Id}"" parentID=""{objectId}"" restricted=""1"">");
                         sb.Append($@"<dc:title>{title}</dc:title>");
                         sb.Append($@"<upnp:class>object.item.videoItem</upnp:class>");
                         sb.Append($@"<res protocolInfo=""http-get:*:{mimeType}:DLNA.ORG_PN=AVC_MP4_HP_HD_AAC;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"" size=""12345"">{eUrl}</res>");
@@ -251,6 +267,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                     didlStr = sb.ToString();
                 }
             }
+
 
             var escapedDidl = System.Security.SecurityElement.Escape($@"<DIDL-Lite xmlns=""urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"">{didlStr}</DIDL-Lite>");
 
