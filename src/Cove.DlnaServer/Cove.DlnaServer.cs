@@ -293,7 +293,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 Uuid = Uuid
             };
 
-            using var commsServer = new Rssdp.Infrastructure.SsdpCommunicationsServer(new Rssdp.SocketFactory(localIp));
+            using var commsServer = new Rssdp.Infrastructure.SsdpCommunicationsServer(new Rssdp.SocketFactory(null));
             using var devicePublisher = new Rssdp.SsdpDevicePublisher(commsServer);
             
             devicePublisher.AddDevice(deviceDefinition);
