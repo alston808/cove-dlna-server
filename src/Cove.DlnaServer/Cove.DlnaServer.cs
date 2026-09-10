@@ -35,16 +35,14 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
             context.Response.ContentType = "text/xml";
             string xml = $@"<?xml version=""1.0""?>
 <root xmlns=""urn:schemas-upnp-org:device-1-0"">
-  <specVersion>
-    <major>1</major>
-    <minor>0</minor>
-  </specVersion>
+  <specVersion><major>1</major><minor>0</minor></specVersion>
   <device>
     <deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
     <friendlyName>Cove Media Server</friendlyName>
     <manufacturer>alston808</manufacturer>
-    <modelName>Cove DLNA Extension</modelName>
+    <modelName>Windows Media Connect compatible (Cove)</modelName>
     <UDN>uuid:{Uuid}</UDN>
+    <dlna:X_DLNADOC xmlns:dlna=""urn:schemas-dlna-org:device-1-0"">DMS-1.50</dlna:X_DLNADOC>
     <serviceList>
       <service>
         <serviceType>urn:schemas-upnp-org:service:ContentDirectory:1</serviceType>
@@ -53,10 +51,74 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
         <controlURL>/api/ext/com.example.dlna-server/control</controlURL>
         <eventSubURL>/api/ext/com.example.dlna-server/events</eventSubURL>
       </service>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:ConnectionManager:1</serviceType>
+        <serviceId>urn:upnp-org:serviceId:ConnectionManager</serviceId>
+        <SCPDURL>/api/ext/com.example.dlna-server/connection-manager</SCPDURL>
+        <controlURL>/api/ext/com.example.dlna-server/control</controlURL>
+        <eventSubURL>/api/ext/com.example.dlna-server/events</eventSubURL>
+      </service>
+      <service>
+        <serviceType>urn:microsoft.com:service:X_MS_MediaReceiverRegistrar:1</serviceType>
+        <serviceId>urn:microsoft.com:serviceId:X_MS_MediaReceiverRegistrar</serviceId>
+        <SCPDURL>/api/ext/com.example.dlna-server/ms-registrar</SCPDURL>
+        <controlURL>/api/ext/com.example.dlna-server/control</controlURL>
+        <eventSubURL>/api/ext/com.example.dlna-server/events</eventSubURL>
+      </service>
     </serviceList>
   </device>
 </root>";
             await context.Response.WriteAsync(xml);
+        });
+
+        endpoints.MapGet("/api/ext/com.example.dlna-server/connection-manager", async (HttpContext context) =>
+        {
+            context.Response.ContentType = "text/xml";
+            await context.Response.WriteAsync(@"<?xml version=""1.0""?>
+<scpd xmlns=""urn:schemas-upnp-org:service-1-0"">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <actionList>
+    <action><name>GetProtocolInfo</name><argumentList><argument><name>Source</name><direction>out</direction><relatedStateVariable>SourceProtocolInfo</relatedStateVariable></argument><argument><name>Sink</name><direction>out</direction><relatedStateVariable>SinkProtocolInfo</relatedStateVariable></argument></argumentList></action>
+    <action><name>GetCurrentConnectionIDs</name><argumentList><argument><name>ConnectionIDs</name><direction>out</direction><relatedStateVariable>CurrentConnectionIDs</relatedStateVariable></argument></argumentList></action>
+    <action><name>GetCurrentConnectionInfo</name><argumentList><argument><name>ConnectionID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_ConnectionID</relatedStateVariable></argument><argument><name>RcsID</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_RcsID</relatedStateVariable></argument><argument><name>AVTransportID</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_AVTransportID</relatedStateVariable></argument><argument><name>ProtocolInfo</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_ProtocolInfo</relatedStateVariable></argument><argument><name>PeerConnectionManager</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_ConnectionManager</relatedStateVariable></argument><argument><name>PeerConnectionID</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_ConnectionID</relatedStateVariable></argument><argument><name>Direction</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Direction</relatedStateVariable></argument><argument><name>Status</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_ConnectionStatus</relatedStateVariable></argument></argumentList></action>
+  </actionList>
+  <serviceStateTable>
+    <stateVariable sendEvents=""yes""><name>SourceProtocolInfo</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""yes""><name>SinkProtocolInfo</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""yes""><name>CurrentConnectionIDs</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_ConnectionStatus</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_ConnectionManager</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_Direction</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_ProtocolInfo</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_ConnectionID</name><dataType>i4</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_AVTransportID</name><dataType>i4</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_RcsID</name><dataType>i4</dataType></stateVariable>
+  </serviceStateTable>
+</scpd>");
+        });
+
+        endpoints.MapGet("/api/ext/com.example.dlna-server/ms-registrar", async (HttpContext context) =>
+        {
+            context.Response.ContentType = "text/xml";
+            await context.Response.WriteAsync(@"<?xml version=""1.0""?>
+<scpd xmlns=""urn:schemas-upnp-org:service-1-0"">
+  <specVersion><major>1</major><minor>0</minor></specVersion>
+  <actionList>
+    <action><name>IsAuthorized</name><argumentList><argument><name>DeviceID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_DeviceID</relatedStateVariable></argument><argument><name>Result</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Result</relatedStateVariable></argument></argumentList></action>
+    <action><name>IsValidated</name><argumentList><argument><name>DeviceID</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_DeviceID</relatedStateVariable></argument><argument><name>Result</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_Result</relatedStateVariable></argument></argumentList></action>
+    <action><name>RegisterDevice</name><argumentList><argument><name>RegistrationReqMsg</name><direction>in</direction><relatedStateVariable>A_ARG_TYPE_RegistrationReqMsg</relatedStateVariable></argument><argument><name>RegistrationRespMsg</name><direction>out</direction><relatedStateVariable>A_ARG_TYPE_RegistrationRespMsg</relatedStateVariable></argument></argumentList></action>
+  </actionList>
+  <serviceStateTable>
+    <stateVariable sendEvents=""yes""><name>AuthorizationGrantedUpdateID</name><dataType>ui4</dataType></stateVariable>
+    <stateVariable sendEvents=""yes""><name>AuthorizationDeniedUpdateID</name><dataType>ui4</dataType></stateVariable>
+    <stateVariable sendEvents=""yes""><name>ValidationSucceededUpdateID</name><dataType>ui4</dataType></stateVariable>
+    <stateVariable sendEvents=""yes""><name>ValidationRevokedUpdateID</name><dataType>ui4</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_DeviceID</name><dataType>string</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_Result</name><dataType>int</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_RegistrationReqMsg</name><dataType>bin.base64</dataType></stateVariable>
+    <stateVariable sendEvents=""no""><name>A_ARG_TYPE_RegistrationRespMsg</name><dataType>bin.base64</dataType></stateVariable>
+  </serviceStateTable>
+</scpd>");
         });
 
         // Protected media streaming endpoint
