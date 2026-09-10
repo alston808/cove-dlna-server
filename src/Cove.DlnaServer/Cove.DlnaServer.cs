@@ -262,10 +262,11 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
         });
     }
 
+    
     public async Task RunAsync(IServiceProvider services, CancellationToken ct)
     {
         var logger = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DlnaExtension>>(services);
-        logger.LogInformation("DLNA Server starting up...");
+        logger.LogInformation("DLNA Server starting up... (Custom SSDP)");
 
         try
         {
@@ -280,24 +281,113 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                 
             var covePort = 5073;
 
-            var deviceDefinition = new Rssdp.SsdpRootDevice()
-            {
-                CacheLifetime = TimeSpan.FromMinutes(30),
-                Location = new Uri($"http://{localIp}:{covePort}/api/ext/com.example.dlna-server/description"),
-                DeviceTypeNamespace = "schemas-upnp-org",
-                DeviceType = "MediaServer",
-                DeviceVersion = 1,
-                FriendlyName = "Cove Media Server",
-                Manufacturer = "alston808",
-                ModelName = "Cove DLNA Extension",
-                Uuid = Uuid
-            };
+            string location = $"http://{localIp}:{covePort}/api/ext/com.example.dlna-server/description";
+            string serverHeader = "Linux/5.15.0 DLNADOC/1.50 UPnP/1.0 MiniDLNA/1.3.3";
+            string usnRoot = $"uuid:{Uuid}::upnp:rootdevice";
+            string usnDevice = $"uuid:{Uuid}::urn:schemas-upnp-org:device:MediaServer:1";
+            string usnUuid = $"uuid:{Uuid}";
 
-            using var commsServer = new Rssdp.Infrastructure.SsdpCommunicationsServer(new Rssdp.SocketFactory(null));
-            using var devicePublisher = new Rssdp.SsdpDevicePublisher(commsServer);
+            var multicastEndpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse("239.255.255.250"), 1900);
             
-            devicePublisher.AddDevice(deviceDefinition);
+            using var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp);
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.Socket, System.Net.Sockets.SocketOptionName.ReuseAddress, true);
+            socket.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, 1900));
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.IP, System.Net.Sockets.SocketOptionName.AddMembership, new System.Net.Sockets.MulticastOption(multicastEndpoint.Address, System.Net.IPAddress.Any));
+            socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.IP, System.Net.Sockets.SocketOptionName.MulticastTimeToLive, 4);
+
             logger.LogInformation("UPnP Device Published! Waiting for SSDP discovery requests.");
+
+            var buffer = new byte[65536];
+            System.Net.EndPoint remoteEndpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0);
+
+            _ = Task.Run(async () =>
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var tcs = new TaskCompletionSource<int>();
+                        socket.BeginReceiveFrom(buffer, 0, buffer.Length, System.Net.Sockets.SocketFlags.None, ref remoteEndpoint, ar =>
+                        {
+                            try
+                            {
+                                int bytesRead = socket.EndReceiveFrom(ar, ref remoteEndpoint);
+                                string message = System.Text.Encoding.UTF8.GetString(buffer, 0, bytesRead);
+                                
+                                if (message.Contains("M-SEARCH"))
+                                {
+                                    string[] lines = message.Split('\n');
+                                    string st = lines.FirstOrDefault(l => l.StartsWith("ST: ", StringComparison.OrdinalIgnoreCase))?.Substring(4).Trim();
+                                    
+                                    if (st != null && (st.Contains("ssdp:all") || st.Contains("upnp:rootdevice") || st.Contains("MediaServer:1") || st.Contains(Uuid)))
+                                    {
+                                        var targets = new[] {
+                                            ("upnp:rootdevice", usnRoot),
+                                            (usnUuid, usnUuid),
+                                            ("urn:schemas-upnp-org:device:MediaServer:1", usnDevice)
+                                        };
+
+                                        foreach (var target in targets)
+                                        {
+                                            string response = $"HTTP/1.1 200 OK\r\n" +
+                                                              $"CACHE-CONTROL: max-age=1800\r\n" +
+                                                              $"DATE: {DateTime.UtcNow.ToString("r")}\r\n" +
+                                                              $"EXT:\r\n" +
+                                                              $"LOCATION: {location}\r\n" +
+                                                              $"SERVER: {serverHeader}\r\n" +
+                                                              $"ST: {target.Item1}\r\n" +
+                                                              $"USN: {target.Item2}\r\n\r\n";
+
+                                            var responseBytes = System.Text.Encoding.UTF8.GetBytes(response);
+                                            socket.SendTo(responseBytes, remoteEndpoint);
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                            tcs.TrySetResult(0);
+                        }, null);
+                        
+                        using (ct.Register(() => tcs.TrySetCanceled()))
+                        {
+                            await tcs.Task;
+                        }
+                    }
+                    catch { break; }
+                }
+            });
+
+            _ = Task.Run(async () =>
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    try
+                    {
+                        var targets = new[] {
+                            ("upnp:rootdevice", usnRoot),
+                            (usnUuid, usnUuid),
+                            ("urn:schemas-upnp-org:device:MediaServer:1", usnDevice)
+                        };
+
+                        foreach (var target in targets)
+                        {
+                            string notify = $"NOTIFY * HTTP/1.1\r\n" +
+                                            $"HOST: 239.255.255.250:1900\r\n" +
+                                            $"CACHE-CONTROL: max-age=1800\r\n" +
+                                            $"LOCATION: {location}\r\n" +
+                                            $"NT: {target.Item1}\r\n" +
+                                            $"NTS: ssdp:alive\r\n" +
+                                            $"SERVER: {serverHeader}\r\n" +
+                                            $"USN: {target.Item2}\r\n\r\n";
+
+                            var notifyBytes = System.Text.Encoding.UTF8.GetBytes(notify);
+                            socket.SendTo(notifyBytes, multicastEndpoint);
+                        }
+                        await Task.Delay(TimeSpan.FromSeconds(60), ct);
+                    }
+                    catch { break; }
+                }
+            });
 
             await Task.Delay(Timeout.Infinite, ct);
         }
@@ -310,4 +400,5 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
             logger.LogError(ex, "DLNA Server encountered a fatal error.");
         }
     }
+
 }
