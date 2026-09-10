@@ -1,0 +1,173 @@
+---
+title: Frontend runtime API
+description: Supported modules, authenticated requests, and shared UI primitives for Cove extension bundles.
+---
+
+Cove loads extension frontend bundles as ESM and provides a versioned set of host modules. Import from this runtime instead of bundling another copy of React or reaching into Cove's internal source tree.
+
+The current runtime contract is `v1`. Cove supplies that value in the aggregated UI manifest; `UIManifestBuilder.WithRuntimeVersion` does not select a different runtime. Treat every import not listed on this page as private implementation detail.
+
+## Runtime modules
+
+Use the `@cove/runtime/*` specifiers in extension source:
+
+| Module | Provides |
+| --- | --- |
+| `@cove/runtime/react` | React |
+| `@cove/runtime/react-dom` | React DOM |
+| `@cove/runtime/react-dom-client` | React DOM client APIs |
+| `@cove/runtime/react-jsx-runtime` | Production JSX runtime |
+| `@cove/runtime/react-jsx-dev-runtime` | Development JSX runtime |
+| `@cove/runtime/react-query` | TanStack Query |
+| `@cove/runtime/lucide-react` | Lucide React icons |
+| `@cove/runtime/components` | Cove's public shared component and hook barrel |
+| `@cove/runtime/api` | Authenticated requests to Cove APIs |
+
+Cove still maps the corresponding bare third-party specifiers for older bundles, but new bundles should use the namespaced runtime imports. Configure the extension build to leave runtime modules external so Cove and the extension share the same React tree and host libraries.
+
+## Authenticated API requests
+
+Import `extensionFetch` from the API module:
+
+```tsx
+import { extensionFetch } from "@cove/runtime/api";
+
+export async function loadSummary() {
+  const response = await extensionFetch("/api/ext/com.example.reports/summary");
+  if (!response.ok) {
+    throw new Error(`Request failed with ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+Its signature is:
+
+```ts
+interface ExtensionFetchOptions extends RequestInit {
+  timeoutMs?: number | null;
+}
+
+function extensionFetch(input: string, init?: ExtensionFetchOptions): Promise<Response>;
+```
+
+`extensionFetch` accepts only same-origin URLs whose path is `/api` or starts with `/api/`. Relative forms such as `api/ext/...` are normalized against the current Cove origin. Cross-origin URLs and non-API paths throw a `TypeError` before a request is sent.
+
+Extension requests do not time out by default, preserving normal `fetch` behavior for long-running extension operations. Set `timeoutMs` to a positive number to opt an individual request into a timeout. Passing `null` or omitting the option leaves the request unlimited; a caller-provided `AbortSignal` can still cancel it.
+
+The helper sends the current bearer or share credentials, uses Cove's normal access-token refresh and single retry behavior, and returns the standard `Response`. It forces `redirect: "error"` so an API request cannot follow a redirect outside the allowed boundary.
+
+Authentication transport does not grant access. Protect the extension endpoint with the appropriate server-side convention from [Extension permissions](../permissions/), and handle expected `401`, `403`, and application errors in the component.
+
+## Shared components
+
+Import public UI building blocks from one barrel:
+
+```tsx
+import {
+  MediaDetailLayout,
+  DetailListToolbar,
+  DetailListPagination,
+  RelatedEntityListView,
+  TagBadge,
+} from "@cove/runtime/components";
+```
+
+The `v1` barrel groups these exports:
+
+| Area | Public exports |
+| --- | --- |
+| Detail and list composition | `MediaDetailLayout`, `DetailListToolbar`, `DetailListPagination`, `ListPage`, `RelatedEntityListView`, `GroupItemFeed`, `getRelatedEntityDisplayModes`, `FilterButton`, `FilterDialog`, `VIDEO_CRITERIA`, `BulkEditDialog`, `getDefaultFilter`, `Pager`, `VIDEO_SORT_OPTIONS` |
+| Entity display and media | `PopoverButton`, `VideoCardPopovers`, `PerformerTile`, `VideoCard`, `VideoTile`, `ImageTile`, `VideoPlayer`, `Lightbox`, `ENTITY_MEDIA_TARGET` |
+| Entity selection | `EntityReferenceSelector`, `EntityReferenceMultiSelector`, `EntityReferenceValue` |
+| Forms and dialogs | `ConfirmDialog`, `EditModal`, `Field`, `TextInput`, `TextArea`, `NumberInput`, `SelectInput`, `SaveButton`, `ImageInput` |
+| Ratings | `InteractiveRating`, `RatingBadge`, `RatingBanner`, `RatingField`, `getRatingBannerColor`, `convertToRatingFormat`, `convertFromRatingFormat`, `formatDisplayRating`, `getRatingMax`, `getRatingStep`, `getRatingInputLabel`, `normalizeRatingOptions`, `defaultRatingSystemOptions` |
+| Utilities and custom fields | `TagBadge`, `NarrativeText`, `useMarkdownRenderingEnabled`, `formatDuration`, `formatFileSize`, `formatDate`, `getResolutionLabel`, `CustomFieldsDisplay`, `CustomFieldsEditor` |
+| Host integration | `openTutorialStoryboard`, `registerManualContext`, `useManualContext`, `useMultiSelect`, `useKeySequence`, `useListUrlState`, `useAppConfig`, `APP_FLOATING_UI_SLOT`, `MEDIA_PLAYER_ACTIONS_SLOT`, `MEDIA_PLAYER_OVERLAY_SLOT` |
+| Types | `MediaDetailLayoutProps`, `MediaDetailTab`, `MediaDetailSectionProps`, `LightboxImage`, `DisplayMode`, `CriterionDefinition`, `TutorialOpenRequest`, `FindFilter`, `EntityMediaFit`, `EntityMediaRenderProps`, `EntityMediaSurface`, `EntityReferenceOption`, `EntityReferenceType`, `MediaPlayerContentRect`, `MediaPlayerExtensionContext`, `MediaPlayerInteractionModeOptions`, `MediaPlayerSurface`, `VideoPlayerSeek`, `VideoPlayerPlaybackControls`, `DetailListPaginationProps` |
+
+The `@cove/extension-sdk` package also publishes `DashboardWidgetProps`, `DashboardWidgetEditorProps`, `DashboardWidgetContribution`, `DashboardWidgetPresentation`, and `JsonValue` for typing dashboard bundles. Render and editor props include the saved `flow` or `canvas` presentation. These are compile-time contracts; widget bundles still import React and request helpers from the versioned `@cove/runtime/*` modules.
+
+The table groups helper families for readability. Check the matching runtime type declarations when a helper has several arguments.
+
+### Native detail layout
+
+`MediaDetailLayout` gives extension pages the same responsive shell used by Cove detail pages. Its required `title` prop accepts a React node. Optional props cover:
+
+- navigation with `backLabel` and `onGoBack`
+- the media region, its aspect ratio and position, sticky behavior, and full-bleed rendering
+- a header image, actions, and engagement controls
+- sidebar or header tabs with an active key and change callback
+- keyboard shortcuts, loading state, errors, and child content
+
+`MediaDetailTab` describes each tab with a stable `key`, `label`, and optional icon, count, disabled state, and manual contexts. `MediaDetailSectionProps` is the small typed wrapper contract for section children and an optional class name.
+
+### Native detail lists
+
+`DetailListToolbar` composes Cove's result count, search, sorting, filter dialog, saved filters, selection controls, display modes, zoom, and paging controls around a `FindFilter`. Supply only the capabilities the embedded list supports; the required props are `filter`, `onFilterChange`, `totalCount`, and `sortOptions`.
+
+Use `DetailListPagination` when the pager belongs below the results instead of inside the toolbar:
+
+```tsx
+<DetailListPagination
+  filter={filter}
+  onFilterChange={setFilter}
+  totalCount={totalCount}
+/>
+```
+
+It also accepts `allowInfinitePageSize`, `infinitePageSizeOnly`, `showPagingControls`, `className`,
+and `ariaLabel`. Give top and bottom pagers distinct `ariaLabel` values. Once a non-empty count is
+known, the paginator corrects an out-of-range `filter.page` through `onFilterChange`; it does not
+reset a deep page while the count is zero or still loading. The pager inside `DetailListToolbar`
+uses `Pagination above results` by default and can be renamed with `paginationAriaLabel`.
+
+These primitives provide Cove's current UI behavior, but the extension still owns its data query, empty and error states, and permission handling. Prefer host CSS variables and shared components over copying internal markup or Tailwind classes that are not part of this barrel.
+
+### Preference-aware narrative text
+
+Use `NarrativeText` for descriptions, biographies, notes, and other narrative metadata that should follow the viewer's Interface preference:
+
+```tsx
+import { NarrativeText } from "@cove/runtime/components";
+
+export function Summary({ details }: { details: string }) {
+  return <NarrativeText className="text-sm leading-6 text-secondary">{details}</NarrativeText>;
+}
+```
+
+The component renders literal whitespace-preserving text by default. When the user enables Markdown rendering, it applies Cove's safe textual Markdown rules and theme-aware styles. Raw HTML and images are not rendered. Safe links open in a new tab. Use `useMarkdownRenderingEnabled()` only when surrounding extension UI must also change; prefer `NarrativeText` when only the text rendering differs.
+
+### Reusable video player controls
+
+`VideoPlayer` can register bounded controls for a component that renders the reusable player:
+
+```tsx
+<VideoPlayer
+  {...playerProps}
+  onSeekRegister={(seek) => {
+    seekRef.current = seek;
+  }}
+  onPlaybackControlRegister={(controls) => {
+    controlsRef.current = controls;
+    return () => {
+      controlsRef.current = null;
+    };
+  }}
+/>
+```
+
+`VideoPlayerSeek(time, forcePlay?)` keeps the historical play-on-seek behavior by default. Pass
+`false` to preserve the current playing or paused state. `VideoPlayerPlaybackControls` provides
+`play`, `pause`, `toggle`, and relative `seekBy`; relative seeks also preserve playback state.
+`play` returns a promise because browser playback policy can reject it. A registration callback may
+return cleanup, which Cove runs before replacing that control generation and when the player
+unmounts. These controls operate the reusable `VideoPlayer`; media-player slot contributions should
+use the bounded controls in `MediaPlayerExtensionContext`.
+
+## Compatibility
+
+Runtime modules are a host contract, not dependencies embedded in the extension archive. Set `minCoveVersion` to the oldest Cove release on which every imported runtime export has been tested. Adding an import introduced by a newer Cove release raises that practical compatibility floor even when the extension's backend contract is unchanged.
+
+Keep a package's frontend imports and its declared compatibility floor in sync, then test installation and the rendered contribution on that minimum version. See [Package an extension](../packaging/) for how installers enforce `minCoveVersion` and [UI extension points](../ui-extension-points/) for where components can be mounted.

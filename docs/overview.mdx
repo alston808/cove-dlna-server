@@ -1,0 +1,44 @@
+---
+title: Extension overview
+description: High-level extension architecture and host boundaries in Cove.
+---
+
+Cove's [extension](../../../reference/extensions/) system is meant to support product capabilities, not only narrow hooks. This page explains the version and design boundaries; use the reference pages for package terminology.
+
+## Version and compatibility boundaries
+
+Three version values answer different questions:
+
+- The **Cove application version** identifies the running host and the contracts it implements.
+- The **Cove.Sdk package version** identifies the compile-time helpers and host contracts used to build an extension. A Cove.Sdk package reference does not set the minimum Cove host version.
+- The manifest's **`minCoveVersion`** is a declared compatibility floor for the application version. It does not select a Cove.Sdk package and is not proof that an extension works on every newer host. Supported **Install from ZIP**, **Install from URL**, and registry installers enforce `minCoveVersion`. For compiled extensions, startup dependency validation reports a version mismatch as a dependency problem, but the current initialization path may still initialize a package placed directly on disk. Manifest-only `bundle` and `scraper-pack` packages are outside the compiled-extension set, so startup validation does not report their Cove-version mismatch.
+
+Build against the Cove.Sdk and host contracts matching the Cove build you test. Set `minCoveVersion` to the oldest Cove version you have actually verified, and retest before claiming compatibility with older or newer versions. Install through a supported installer; do not treat startup validation of a manually copied package as compatibility enforcement.
+
+When an extension adopts a host feature from `main` before the next Cove release is known, use that development build as the floor—for example, `1.1.1-dev.42` after the `1.1.0` release. The tagged `1.1.0` release does not satisfy that requirement, while later development builds on the same line and later Cove releases do. Development builds use normal SemVer ordering; the next patch number is a canonical development line rather than a prediction of the next release. See the [core contribution and version policy](../../contributing/core-development/) for the complete model.
+
+## What extensions can contribute
+
+An extension can combine several [contributions](../../../reference/contributions/) across backend and frontend [extension points](../../../reference/extension-points/). Use the [Extension-point catalog](../extension-points/) for current interfaces and the [UI extension reference](../../../reference/ui-extensions/) for the frontend boundary.
+
+## Why that matters
+
+The model lets users add capabilities while Cove retains control of lifecycle, composition, authorization, and a consistent application shell.
+
+## The main boundaries
+
+Extensions should:
+
+- request the minimum permissions needed
+- expose behavior clearly enough for administrators to review
+- preserve provenance when changing user-visible metadata
+- keep UI additions consistent with the rest of Cove
+
+## Where to go next
+
+- [Extension points](../extension-points/) for the host-supported capability catalog
+- [Packaging](../packaging/) for artifact and layout expectations
+- [Permissions](../permissions/) for access design
+- [Frontend runtime API](../frontend-runtime/) for supported imports and shared UI primitives
+- [Create an extension](../create-extension/) for the practical starting flow
+- [API surface](../../api/overview/) for integration expectations

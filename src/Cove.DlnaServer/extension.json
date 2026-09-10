@@ -1,0 +1,22 @@
+{
+  "id": "com.example.dlna-server",
+  "name": "DLNA Media Server",
+  "version": "0.1.0",
+  "description": "Exposes Cove library via UPnP/DLNA.",
+  "author": "alston808",
+  "url": "https://github.com/alston808/cove-dlna-server",
+  "kind": "extension",
+  "categories": ["tools"],
+  "minCoveVersion": "1.0.0",
+  "entryDll": "Cove.DlnaServer.dll",
+  "dependencies": {},
+  "externalDependencies": [],
+  "settings": [],
+  "tutorialTopics": [],
+  "sharedAssemblies": [],
+  "permissions": {
+    "network": [],
+    "scraperRuntime": [],
+    "downloaderRuntime": []
+  }
+}
