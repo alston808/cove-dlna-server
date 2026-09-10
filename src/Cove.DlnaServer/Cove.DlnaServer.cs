@@ -213,15 +213,22 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
             var hostIp = context.Request.Host.Host;
             var hostPort = context.Request.Host.Port ?? 5073;
 
-            if (objectId == "0") // Root
+            if (browseFlag == "BrowseMetadata")
             {
-                if (browseFlag == "BrowseMetadata")
+                didlStr = $@"<container id=""{objectId}"" parentID=""-1"" restricted=""1""><dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">Folder</dc:title><upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.container</upnp:class></container>";
+                count = 1;
+                totalMatches = 1;
+            }
+            else if (browseFlag == "BrowseDirectChildren")
+            {
+                if (objectId == "0")
                 {
-                    didlStr = @"<container id=""0"" parentID=""-1"" restricted=""1""><dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">Root</dc:title><upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.container</upnp:class></container>";
+                    // Root directory shows "All Videos" folder
+                    didlStr = $@"<container id=""1"" parentID=""0"" restricted=""1""><dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">All Videos</dc:title><upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.container</upnp:class></container>";
                     count = 1;
                     totalMatches = 1;
                 }
-                else if (browseFlag == "BrowseDirectChildren")
+                else
                 {
                     var videos = await db.Set<Video>().Include(v => v.Files).Take(50).ToListAsync();
                     totalMatches = videos.Count;
@@ -235,7 +242,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                         var url = $"http://{hostIp}:{hostPort}/api/ext/com.example.dlna-server/stream/{v.Id}?t={_currentToken}";
                         var eUrl = System.Security.SecurityElement.Escape(url);
                         
-                        sb.Append($@"<item id=""{v.Id}"" parentID=""0"" restricted=""1"">");
+                        sb.Append($@"<item id=""vid_{v.Id}"" parentID=""{objectId}"" restricted=""1"">");
                         sb.Append($@"<dc:title xmlns:dc=""http://purl.org/dc/elements/1.1/"">{title}</dc:title>");
                         sb.Append($@"<upnp:class xmlns:upnp=""urn:schemas-upnp-org:metadata-1-0/upnp/"">object.item.videoItem</upnp:class>");
                         sb.Append($@"<res protocolInfo=""http-get:*:{mimeType}:*"" size=""12345"">{eUrl}</res>");
