@@ -9,12 +9,23 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Cove.Sdk;
 using Cove.Plugins;
+using System.Timers;
 
 namespace Cove.DlnaServer;
 
 public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IApiExtension
 {
     private const string Uuid = "b3c7b653-7313-41bb-98f5-9afb762ef4f1"; // Fixed UUID for SSDP
+    private static string _currentToken = Guid.NewGuid().ToString("N");
+    private static System.Timers.Timer _tokenRotationTimer;
+
+    public DlnaExtension()
+    {
+        // Rotate the token every 3 hours
+        _tokenRotationTimer = new System.Timers.Timer(TimeSpan.FromHours(3).TotalMilliseconds);
+        _tokenRotationTimer.Elapsed += (s, e) => { _currentToken = Guid.NewGuid().ToString("N"); };
+        _tokenRotationTimer.Start();
+    }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
     {
@@ -45,6 +56,24 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
   </device>
 </root>";
             await context.Response.WriteAsync(xml);
+        });
+
+        // Protected media streaming endpoint
+        endpoints.MapGet("/api/ext/com.example.dlna-server/stream/{id}", async (HttpContext context, string id) =>
+        {
+            var token = context.Request.Query["t"];
+            if (token != _currentToken)
+            {
+                context.Response.StatusCode = 403;
+                await context.Response.WriteAsync("Forbidden: Invalid or expired DLNA token.");
+                return;
+            }
+
+            // TODO: Query your Cove database for the file path matching the 'id'
+            // var filePath = ...;
+            // await context.Response.SendFileAsync(filePath);
+            
+            await context.Response.WriteAsync($"Streaming video {id} using valid token!");
         });
     }
     public async Task RunAsync(IServiceProvider services, CancellationToken ct)
