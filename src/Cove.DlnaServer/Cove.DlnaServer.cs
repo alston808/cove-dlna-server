@@ -238,7 +238,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
                     foreach(var v in videos)
                     {
                         var title = System.Security.SecurityElement.Escape(v.Title ?? "Unknown Video");
-                        var mimeType = "video/mp4"; // Default
+                        var mimeType = "video/mp4";
                         var url = $"http://{hostIp}:{hostPort}/api/ext/com.example.dlna-server/stream/{v.Id}?t={_currentToken}";
                         var eUrl = System.Security.SecurityElement.Escape(url);
                         
