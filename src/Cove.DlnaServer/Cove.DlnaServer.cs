@@ -54,9 +54,16 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
 
         try
         {
-            var localIp = System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName())
-                .FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)?.ToString() ?? "127.0.0.1";
-            var covePort = 5000; // Change this to your actual Cove port if different
+            var localIp = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork 
+                         && !System.Net.IPAddress.IsLoopback(a.Address)
+                         && !a.Address.ToString().StartsWith("172."))
+                .Select(a => a.Address.ToString())
+                .FirstOrDefault() ?? "127.0.0.1";
+                
+            var covePort = 5073; // Based on your docker-compose.allinone.yml
 
             var deviceDefinition = new Rssdp.SsdpRootDevice()
             {
