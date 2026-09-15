@@ -7,7 +7,7 @@
   "url": "https://github.com/alston808/cove-dlna-server",
   "kind": "extension",
   "categories": ["tools"],
-  "minCoveVersion": "1.0.0",
+  "minCoveVersion": "0.0.0",
   "entryDll": "Cove.DlnaServer.dll",
   "dependencies": {},
   "externalDependencies": [],
