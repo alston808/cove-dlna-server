@@ -1,5 +1,5 @@
 {
-  "id": "com.example.dlna-server",
+  "id": "cove.dlna-server",
   "name": "DLNA Media Server",
   "version": "0.1.0",
   "description": "Exposes Cove library via UPnP/DLNA.",
