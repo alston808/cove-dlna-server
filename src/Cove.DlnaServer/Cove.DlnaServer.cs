@@ -34,7 +34,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
         {
             context.Response.ContentType = "text/xml";
             string xml = $@"<?xml version=""1.0""?>
-<root xmlns=""urn:schemas-upnp-org:device-1-0"">
+<root xmlns=""urn:schemas-upnp-org:device-1-0"" xmlns:dlna=""urn:schemas-dlna-org:device-1-0"">
   <specVersion><major>1</major><minor>0</minor></specVersion>
   <device>
     <deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>
@@ -42,7 +42,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IBackgroundExtension, IAp
     <manufacturer>alston808</manufacturer>
     <modelName>Windows Media Connect compatible (Cove)</modelName>
     <UDN>uuid:{Uuid}</UDN>
-    <dlna:X_DLNADOC xmlns:dlna=""urn:schemas-dlna-org:device-1-0"">DMS-1.50</dlna:X_DLNADOC>
+    <dlna:X_DLNADOC>DMS-1.50</dlna:X_DLNADOC>
     <serviceList>
       <service>
         <serviceType>urn:schemas-upnp-org:service:ContentDirectory:1</serviceType>
