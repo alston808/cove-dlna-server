@@ -416,6 +416,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IApiExtension, IBackgroun
     private static string DeviceDescription(HttpContext context)
     {
         var root = new XElement(UpnpDevice + "root",
+            new XAttribute(XNamespace.Xmlns + "dlna", Dlna),
             new XElement(UpnpDevice + "specVersion", new XElement(UpnpDevice + "major", "1"), new XElement(UpnpDevice + "minor", "0")),
             new XElement(UpnpDevice + "device",
                 new XElement(UpnpDevice + "deviceType", DeviceType), new XElement(UpnpDevice + "friendlyName", "Cove Media Server"),
