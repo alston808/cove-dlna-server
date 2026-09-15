@@ -34,6 +34,7 @@ public sealed class DlnaExtension : CoveExtensionBase, IApiExtension, IBackgroun
     private static readonly XNamespace Didl = DidlNamespace;
     private static readonly XNamespace Dc = DcNamespace;
     private static readonly XNamespace Upnp = UpnpNamespace;
+    private static readonly XNamespace UpnpDevice = "urn:schemas-upnp-org:device-1-0";
     private static readonly XNamespace Dlna = "urn:schemas-dlna-org:device-1-0";
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)
@@ -414,24 +415,24 @@ public sealed class DlnaExtension : CoveExtensionBase, IApiExtension, IBackgroun
 
     private static string DeviceDescription(HttpContext context)
     {
-        var root = new XElement("root", new XAttribute("xmlns", "urn:schemas-upnp-org:device-1-0"),
-            new XElement("specVersion", new XElement("major", "1"), new XElement("minor", "0")),
-            new XElement("device",
-                new XElement("deviceType", DeviceType), new XElement("friendlyName", "Cove Media Server"),
-                new XElement("manufacturer", "Cove"), new XElement("modelName", "Cove DLNA Server"),
-                new XElement("modelNumber", "1.0"), new XElement("UDN", $"uuid:{DeviceUuid}"),
+        var root = new XElement(UpnpDevice + "root",
+            new XElement(UpnpDevice + "specVersion", new XElement(UpnpDevice + "major", "1"), new XElement(UpnpDevice + "minor", "0")),
+            new XElement(UpnpDevice + "device",
+                new XElement(UpnpDevice + "deviceType", DeviceType), new XElement(UpnpDevice + "friendlyName", "Cove Media Server"),
+                new XElement(UpnpDevice + "manufacturer", "Cove"), new XElement(UpnpDevice + "modelName", "Cove DLNA Server"),
+                new XElement(UpnpDevice + "modelNumber", "1.0"), new XElement(UpnpDevice + "UDN", $"uuid:{DeviceUuid}"),
                 new XElement(Dlna + "X_DLNADOC", "DMS-1.50"),
-                new XElement("serviceList",
+                new XElement(UpnpDevice + "serviceList",
                     Service("ContentDirectory", ContentDirectoryType, "cds_scpd.xml", "cds/control"),
                     Service("ConnectionManager", ConnectionManagerType, "cm_scpd.xml", "cm/control"))));
         return new XDocument(new XDeclaration("1.0", "utf-8", null), root).ToString();
     }
 
     private static XElement Service(string id, string type, string scpd, string control) =>
-        new("service", new XElement("serviceType", type),
-            new XElement("serviceId", $"urn:upnp-org:serviceId:{id}"),
-            new XElement("SCPDURL", $"/{scpd}"), new XElement("controlURL", $"/{control}"),
-            new XElement("eventSubURL", "/events"));
+        new(UpnpDevice + "service", new XElement(UpnpDevice + "serviceType", type),
+            new XElement(UpnpDevice + "serviceId", $"urn:upnp-org:serviceId:{id}"),
+            new XElement(UpnpDevice + "SCPDURL", $"/{scpd}"), new XElement(UpnpDevice + "controlURL", $"/{control}"),
+            new XElement(UpnpDevice + "eventSubURL", "/events"));
 
     private static string ContentDirectoryScpd() => Scpd("ContentDirectory",
         ("Browse", "ObjectID,BrowseFlag,Filter,StartingIndex,RequestedCount,SortCriteria,Result,NumberReturned,TotalMatches,UpdateID"),

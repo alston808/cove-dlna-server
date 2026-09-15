@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Building Cove DLNA Extension with bundled Node server..."
+echo "Building Cove DLNA Extension..."
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -9,11 +9,6 @@ cd "$SCRIPT_DIR"
 # Add these two lines to configure the .NET environment
 export DOTNET_ROOT="/home/alston/.dotnet"
 export PATH="$PATH:$DOTNET_ROOT:$DOTNET_ROOT/tools"
-
-# Build Node dependencies first
-cd src/Cove.DlnaServer/NodeBridge
-npm install --production
-cd ../../../
 
 # Restore and Publish C#
 dotnet restore src/Cove.DlnaServer/Cove.DlnaServer.csproj
